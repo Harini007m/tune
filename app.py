@@ -240,6 +240,22 @@ def train_model():
     print(f"\n✅ Training complete in {elapsed:.1f}s.")
     print(f"   The frozen T5 model is now conditioned for sentiment analysis.\n")
 
+    # Save prompt-tuned model
+    print("   Saving prompt-tuned model...")
+    saved_dir = "./saved_models"
+    os.makedirs(saved_dir, exist_ok=True)
+
+    peft_dir = os.path.join(saved_dir, "peft_adapter")
+    peft_model.save_pretrained(peft_dir)
+    tokenizer.save_pretrained(peft_dir)
+
+    import shutil
+    shutil.make_archive(os.path.join(saved_dir, "prompt_tuning_model"), "zip", peft_dir)
+    print(f"   Saved PEFT model to '{peft_dir}' and zipped to '{saved_dir}/prompt_tuning_model.zip'.")
+
+    torch.save(peft_model.state_dict(), os.path.join(saved_dir, "prompt_tuning_model.pt"))
+    print(f"   Saved full PEFT model state_dict to '{saved_dir}/prompt_tuning_model.pt'.\n")
+
 
 # =============================================================================
 #  5. EVALUATION
@@ -365,6 +381,56 @@ def predict_custom_text():
 
 
 # =============================================================================
+#  6.5 IMPORT/LOAD SAVED MODEL
+# =============================================================================
+def load_saved_model():
+    """Load a previously saved model from a ZIP file or a PT file."""
+    global peft_model, is_trained
+
+    if base_model is None:
+        print("Base model not loaded.")
+        return
+
+    print("\n📥 Import / Load Saved Model")
+    print("  1. Load from PEFT directory / ZIP file ('prompt_tuning_model.zip')")
+    print("  2. Load from PyTorch state_dict file ('prompt_tuning_model.pt')")
+    print("  3. Back")
+    
+    choice = input("\n  Select option (1-3): ").strip()
+    if choice == "1":
+        import zipfile
+        zip_path = "saved_models/prompt_tuning_model.zip"
+        extract_dir = "saved_models/peft_adapter"
+        
+        if not os.path.exists(zip_path) and not os.path.exists(extract_dir):
+            print(f"❌ Neither '{zip_path}' nor directory '{extract_dir}' was found. Please train a model first.")
+            return
+            
+        if os.path.exists(zip_path) and not os.path.exists(extract_dir):
+            print(f"   Extracting '{zip_path}' to '{extract_dir}'...")
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+                
+        print(f"   Loading PEFT model from '{extract_dir}'...")
+        from peft import PeftModel
+        peft_model = PeftModel.from_pretrained(base_model, extract_dir).to(DEVICE)
+        is_trained = True
+        print("✅ Model successfully loaded from ZIP/PEFT folder!\n")
+        
+    elif choice == "2":
+        pt_path = "saved_models/prompt_tuning_model.pt"
+        if not os.path.exists(pt_path):
+            print(f"❌ State-dict file '{pt_path}' not found. Please train a model first.")
+            return
+            
+        print(f"   Loading state_dict from '{pt_path}'...")
+        state_dict = torch.load(pt_path, map_location=DEVICE)
+        peft_model.load_state_dict(state_dict)
+        is_trained = True
+        print("✅ Model state_dict successfully loaded from PT file!\n")
+
+
+# =============================================================================
 #  7. INTERACTIVE CLI MENU
 # =============================================================================
 def print_banner():
@@ -393,7 +459,8 @@ def print_menu():
     print("║" + "  2. Evaluate Model on Test Set                " + "║")
     print("║" + "  3. Compare Parameters (Full FT vs PT)        " + "║")
     print("║" + "  4. Test Custom Text                          " + "║")
-    print("║" + "  5. Exit                                      " + "║")
+    print("║" + "  5. Import/Load Saved Model                   " + "║")
+    print("║" + "  6. Exit                                      " + "║")
     print("║" + "                                               " + "║")
     print("╚" + "═" * 50 + "╝")
 
@@ -411,7 +478,7 @@ def main():
 
     while True:
         print_menu()
-        choice = input("\n  Select option (1-5): ").strip()
+        choice = input("\n  Select option (1-6): ").strip()
 
         if choice == "1":
             train_model()
@@ -422,10 +489,12 @@ def main():
         elif choice == "4":
             predict_custom_text()
         elif choice == "5":
+            load_saved_model()
+        elif choice == "6":
             print("\n Goodbye! Keep exploring Parameter-Efficient Fine-Tuning.\n")
             sys.exit(0)
         else:
-            print("Invalid option. Please enter 1-5.\n")
+            print("Invalid option. Please enter 1-6.\n")
 
 
 # =============================================================================

@@ -1,0 +1,4 @@
+# Model checkpoints
+*.pt
+*.zip
+prompt_tuning_output/

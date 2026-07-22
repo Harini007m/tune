@@ -135,7 +135,11 @@ def predict(text, tokenizer, model):
 # ==============================================================================
 #  LOAD RESOURCES
 # ==============================================================================
-tokenizer, model = load_model()
+tokenizer, model_init = load_model()
+if "model" not in st.session_state:
+    st.session_state["model"] = model_init
+model = st.session_state["model"]
+
 train_ds, eval_ds, raw_dataset = load_data(tokenizer)
 
 
@@ -152,13 +156,41 @@ with st.sidebar:
         st.text("GPU:     Not available")
 
     st.divider()
-    st.header("Config")
-    st.text(f"Model:          {MODEL_NAME}")
-    st.text(f"Virtual Tokens: {NUM_VIRTUAL_TOKENS}")
-    st.text(f"Epochs:         {NUM_EPOCHS}")
-    st.text(f"Learning Rate:  {LEARNING_RATE}")
-    st.text(f"Train Samples:  {TRAIN_SAMPLES}")
-    st.text(f"Batch Size:     {BATCH_SIZE}")
+    st.header("Import Model")
+    uploaded_file = st.file_uploader(
+        "Upload saved model (ZIP or PT)", 
+        type=["zip", "pt"],
+        help="Upload 'prompt_tuning_model.zip' or 'prompt_tuning_model.pt' to load a trained model."
+    )
+    if uploaded_file is not None:
+        if st.button("Load Uploaded Model", type="primary"):
+            try:
+                if uploaded_file.name.endswith(".zip"):
+                    import tempfile
+                    import zipfile
+                    extract_dir = "saved_models/peft_adapter"
+                    with tempfile.TemporaryDirectory() as tmp_dir:
+                        zip_path = os.path.join(tmp_dir, "imported.zip")
+                        with open(zip_path, "wb") as f:
+                            f.write(uploaded_file.getbuffer())
+                        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                            zip_ref.extractall(extract_dir)
+                    
+                    from peft import PeftModel
+                    base_model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
+                    st.session_state["model"] = PeftModel.from_pretrained(base_model, extract_dir).to(DEVICE)
+                    st.session_state["trained"] = True
+                    st.success("Successfully loaded PEFT model from ZIP!")
+                    st.rerun()
+                elif uploaded_file.name.endswith(".pt"):
+                    import io
+                    state_dict = torch.load(io.BytesIO(uploaded_file.getbuffer()), map_location=DEVICE)
+                    model.load_state_dict(state_dict)
+                    st.session_state["trained"] = True
+                    st.success("Successfully loaded state_dict from PT!")
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Error loading model: {e}")
 
 
 # ==============================================================================
@@ -262,9 +294,47 @@ with tab_train:
         elapsed = time.time() - start
 
         progress_bar.progress(100, text="Training complete!")
+        
+        # Save model to disk
+        saved_dir = "./saved_models"
+        os.makedirs(saved_dir, exist_ok=True)
+        
+        peft_dir = os.path.join(saved_dir, "peft_adapter")
+        model.save_pretrained(peft_dir)
+        tokenizer.save_pretrained(peft_dir)
+        
+        import shutil
+        shutil.make_archive(os.path.join(saved_dir, "prompt_tuning_model"), "zip", peft_dir)
+        torch.save(model.state_dict(), os.path.join(saved_dir, "prompt_tuning_model.pt"))
+        
         st.session_state["trained"] = True
+        st.success(f"Training finished in {elapsed:.1f}s. Model saved successfully!")
 
-        st.success(f"Training finished in {elapsed:.1f}s")
+    # Offer download buttons if a model has been trained
+    if st.session_state.get("trained", False):
+        st.divider()
+        st.subheader("Save / Download Trained Model")
+        col1, col2 = st.columns(2)
+        
+        zip_path = "saved_models/prompt_tuning_model.zip"
+        pt_path = "saved_models/prompt_tuning_model.pt"
+        
+        if os.path.exists(zip_path):
+            with open(zip_path, "rb") as f:
+                col1.download_button(
+                    label="📥 Download Model as ZIP (PEFT)",
+                    data=f.read(),
+                    file_name="prompt_tuning_model.zip",
+                    mime="application/zip",
+                )
+        if os.path.exists(pt_path):
+            with open(pt_path, "rb") as f:
+                col2.download_button(
+                    label="📥 Download Weights as PT",
+                    data=f.read(),
+                    file_name="prompt_tuning_model.pt",
+                    mime="application/octet-stream",
+                )
 
 
 # -- TAB 3: Evaluation ---------------------------------------------------------

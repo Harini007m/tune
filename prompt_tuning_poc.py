@@ -87,6 +87,22 @@ trainer.train()
 
 print("\nTraining complete! The frozen model is now conditioned for sentiment analysis.")
 
+# Save the model
+print("\nSaving model...")
+saved_dir = "./saved_models"
+os.makedirs(saved_dir, exist_ok=True)
+
+peft_dir = os.path.join(saved_dir, "peft_adapter")
+model.save_pretrained(peft_dir)
+tokenizer.save_pretrained(peft_dir)
+
+import shutil
+shutil.make_archive(os.path.join(saved_dir, "prompt_tuning_model"), "zip", peft_dir)
+print(f"Saved PEFT model to '{peft_dir}' and zipped to '{saved_dir}/prompt_tuning_model.zip'.")
+
+torch.save(model.state_dict(), os.path.join(saved_dir, "prompt_tuning_model.pt"))
+print(f"Saved full PEFT model state_dict to '{saved_dir}/prompt_tuning_model.pt'.")
+
 
 print("\n--- Phase 3: Inference and Testing ---")
 # Put the model in evaluation mode
