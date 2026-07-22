@@ -145,7 +145,7 @@ def count_parameters(model):
 def display_parameter_comparison():
     """Print a side-by-side comparison of Full FT vs Prompt Tuning params."""
     if peft_model is None:
-        print("⚠️  Model not loaded. Run option 1 first.")
+        print("Model not loaded. Run option 1 first.")
         return
 
     pt_trainable, pt_total = count_parameters(peft_model)
@@ -157,16 +157,16 @@ def display_parameter_comparison():
     pt_percent = (pt_trainable / pt_total) * 100
 
     print()
-    print("╔" + "═" * 58 + "╗")
-    print("║" + "  PARAMETER COMPARISON: Full Fine-Tuning vs Prompt Tuning ".ljust(58) + "║")
-    print("╠" + "═" * 58 + "╣")
-    print("║" + f"  Full Fine-Tuning Trainable:  {full_ft_trainable:>14,}  (100.00%)".ljust(58) + "║")
+    print("╔" + "═" * 58 +                                                                             "╗")
+    print("║" + "  PARAMETER COMPARISON: Full Fine-Tuning vs Prompt Tuning ".ljust(58) +               "║")
+    print("╠" + "═" * 58 +                                                                             "╣")
+    print("║" + f"  Full Fine-Tuning Trainable:  {full_ft_trainable:>14,}  (100.00%)".ljust(58) +      "║")
     print("║" + f"  Prompt Tuning Trainable:     {pt_trainable:>14,}  ({pt_percent:.4f}%)".ljust(58) + "║")
-    print("║" + "─" * 56 + "  ║")
-    print("║" + f"  Parameter Reduction:         {reduction_factor:>14,.0f}×  fewer".ljust(58) + "║")
-    print("║" + f"  Parameters Saved:            {(100 - pt_percent):>13.4f}%".ljust(58) + "║")
-    print("╠" + "═" * 58 + "╣")
-    print("║" + "                                                          " + "║")
+    print("║" + "─" * 56 + "                                                                            ║")
+    print("║" + f"  Parameter Reduction:         {reduction_factor:>14,.0f}×  fewer".ljust(58) +       "║")
+    print("║" + f"  Parameters Saved:            {(100 - pt_percent):>13.4f}%".ljust(58) +             "║")
+    print("╠" + "═" * 58 +                                                                             "╣")
+    print("║" + "                                                                                  " + "║")
 
     # Engineering Analysis Table
     rows = [
@@ -185,7 +185,7 @@ def display_parameter_comparison():
         line = f"  {feat:<20} {full:<22} {pt}"
         print("║" + line.ljust(58) + "║")
 
-    print("║" + "                                                          " + "║")
+    print("║" + "      " + "║")
     print("╚" + "═" * 58 + "╝")
     print()
 
@@ -198,7 +198,7 @@ def train_model():
     global is_trained
 
     if peft_model is None or train_dataset is None:
-        print("⚠️  Model or dataset not loaded. Please wait for initialisation.")
+        print("Model or dataset not loaded. Please wait for initialisation.")
         return
 
     print("\nStarting Prompt Tuning Training...")
@@ -247,11 +247,11 @@ def train_model():
 def evaluate_model():
     """Evaluate accuracy on the SST-2 validation set."""
     if peft_model is None or eval_dataset is None:
-        print("⚠️  Model or dataset not loaded.")
+        print("Model or dataset not loaded.")
         return
 
     if not is_trained:
-        print("⚠️  Model not yet trained. Run option 1 first.")
+        print("Model not yet trained. Run option 1 first.")
         return
 
     print("\n Evaluating on SST-2 validation set...")
@@ -302,12 +302,12 @@ def evaluate_model():
     accuracy = correct / total * 100 if total > 0 else 0
 
     print()
-    print("╔" + "═" * 44 + "╗")
-    print("║" + "  EVALUATION RESULTS".ljust(44) + "║")
-    print("╠" + "═" * 44 + "╣")
-    print("║" + f"  Correct:    {correct} / {total}".ljust(44) + "║")
-    print("║" + f"  Accuracy:   {accuracy:.2f}%".ljust(44) + "║")
-    print("║" + f"  Dataset:    SST-2 Validation".ljust(44) + "║")
+    print("╔" + "═" * 44 +                                            "╗")
+    print("║" + "  EVALUATION RESULTS".ljust(44) +                    "║")
+    print("╠" + "═" * 44 +                                            "╣")
+    print("║" + f"  Correct:    {correct} / {total}".ljust(44) +      "║")
+    print("║" + f"  Accuracy:   {accuracy:.2f}%".ljust(44) +          "║")
+    print("║" + f"  Dataset:    SST-2 Validation".ljust(44) +         "║")
     print("║" + f"  Method:     Prompt Tuning (T5-Small)".ljust(44) + "║")
     print("╚" + "═" * 44 + "╝")
     print()
@@ -321,11 +321,11 @@ def evaluate_model():
 def predict_custom_text():
     """Let the user type a sentence and get a sentiment prediction."""
     if peft_model is None:
-        print("⚠️  Model not loaded.")
+        print("Model not loaded.")
         return
 
     if not is_trained:
-        print("⚠️  Model not trained yet. Run option 1 first.")
+        print("Model not trained yet. Run option 1 first.")
         return
 
     print("\n🔮 Custom Text Prediction")
@@ -372,9 +372,9 @@ def print_banner():
     print()
     print("╔" + "═" * 62 + "╗")
     print("║" + "                                                              " + "║")
-    print("║" + "   🧠  PROMPT TUNING PoC                                      " + "║")
-    print("║" + "   Paper: The Power of Scale for Parameter-Efficient           " + "║")
-    print("║" + "          Prompt Tuning (Lester et al., 2021)                  " + "║")
+    print("║" + "   PROMPT TUNING PoC                                          " + "║")
+    print("║" + "   Paper: The Power of Scale for Parameter-Efficient          " + "║")
+    print("║" + "          Prompt Tuning (Lester et al., 2021)                 " + "║")
     print("║" + "                                                              " + "║")
     print("║" + "   Model: T5-Small (frozen) + Soft Prompt                     " + "║")
     print("║" + "   Task:  Sentiment Analysis on SST-2                         " + "║")
@@ -385,10 +385,10 @@ def print_banner():
 
 def print_menu():
     """Display the interactive menu."""
-    print("╔" + "═" * 50 + "╗")
-    print("║" + "     PROMPT TUNING PoC — Interactive Menu          " + "║")
-    print("╠" + "═" * 50 + "╣")
-    print("║" + "                                                  " + "║")
+    print("╔" + "═" * 50 +                                          "╗")
+    print("║" + "     PROMPT TUNING PoC — Interactive Menu      " + "║")
+    print("╠" + "═" * 50 +                                          "╣")
+    print("║" + "                                               " + "║")
     print("║" + "  1. Train Prompt-Tuned Model                  " + "║")
     print("║" + "  2. Evaluate Model on Test Set                " + "║")
     print("║" + "  3. Compare Parameters (Full FT vs PT)        " + "║")
@@ -422,10 +422,10 @@ def main():
         elif choice == "4":
             predict_custom_text()
         elif choice == "5":
-            print("\n👋 Goodbye! Keep exploring Parameter-Efficient Fine-Tuning.\n")
+            print("\n Goodbye! Keep exploring Parameter-Efficient Fine-Tuning.\n")
             sys.exit(0)
         else:
-            print("⚠️  Invalid option. Please enter 1-5.\n")
+            print("Invalid option. Please enter 1-5.\n")
 
 
 # =============================================================================
