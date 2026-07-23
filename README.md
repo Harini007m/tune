@@ -109,13 +109,17 @@ Soft prompts are **learnable continuous vectors** that live in the model's embed
 
 ### Trainable Parameters
 
-In our implementation with T5-Small:
+In our implementations with T5-Small, we support two virtual token configurations:
 
-- **Total model parameters:** ~60.5 million
-- **Soft prompt parameters:** 8 virtual tokens × 512 embedding dim = **4,096**
-- **Percentage trainable:** ~0.0068%
-
-This means we train fewer than **five thousand** numbers to adapt a 60-million-parameter model!
+- **Primary Applications (Streamlit Dashboard & Interactive CLI App)**:
+  - **Total model parameters**: ~60.5 million
+  - **Soft prompt parameters**: 20 virtual tokens × 512 embedding dim = **10,240**
+  - **Percentage trainable**: ~0.0169% (only ~10K trainable weights!)
+  
+- **Minimal Programmatic PoC Script (`prompt_tuning_poc.py`)**:
+  - **Total model parameters**: ~60.5 million
+  - **Soft prompt parameters**: 8 virtual tokens × 512 embedding dim = **4,096**
+  - **Percentage trainable**: ~0.0068% (fewer than 5K trainable weights!)
 
 ### Parameter Efficiency
 
@@ -250,63 +254,87 @@ graph TB
 
 | Feature | Full Fine-Tuning | Prompt Tuning |
 | ------- | ---------------- | ------------- |
-| **Trainable Parameters** | ~60.5 M (100%) | ~4,096 (0.0068%) |
+| **Trainable Parameters** | ~60.5 M (100%) | ~10,240 (0.0169%) *[1]* |
 | **Training Speed** | Slow — gradients for all layers | Fast — gradients only for prompt |
-| **Memory Usage** | High — optimizer states for all params | Very Low — optimizer states for ~4K params |
-| **Storage per Task** | ~242 MB (full model copy) | ~16 KB (prompt vectors only) |
+| **Memory Usage** | High — optimizer states for all params | Very Low — optimizer states for ~10K params |
+| **Storage per Task** | ~242 MB (full model copy) | ~40 KB (prompt vectors only) |
 | **Cost (GPU Hours)** | High | Minimal (runs on CPU/single GPU) |
 | **Risk of Overfitting** | Higher on small datasets | Lower — fewer params to overfit |
 | **Multi-task Serving** | N model copies for N tasks | 1 model + N tiny prompt files |
 | **Catastrophic Forgetting** | Possible | Impossible (model is frozen) |
 
+*Note [1]: Trains 10,240 parameters (20 virtual tokens) in the Streamlit and CLI apps, and 4,096 parameters (8 virtual tokens) in the minimal PoC script.*
+
 ### Row-by-Row Explanation
 
 **Trainable Parameters:**
-Full fine-tuning updates every weight in the model (~60.5M for T5-Small). Prompt Tuning only trains the soft prompt vectors (8 tokens × 512 dimensions = 4,096 parameters). This is a **14,700× reduction**.
+Full fine-tuning updates every weight in the model (~60.5M for T5-Small). Prompt Tuning only trains the soft prompt vectors:
+- **CLI / Streamlit Apps**: 20 tokens × 512 dimensions = 10,240 parameters (a **5,909× reduction**).
+- **Programmatic PoC**: 8 tokens × 512 dimensions = 4,096 parameters (a **14,700× reduction**).
 
 **Training Speed:**
 In full fine-tuning, every backward pass computes gradients for all layers. In Prompt Tuning, gradients are only computed for the soft prompt — the frozen layers don't need gradient computation for their own parameters (though activations still flow through them). This significantly reduces the compute per step.
 
 **Memory Usage:**
-The Adam optimiser stores 2 extra copies of every trainable parameter (momentum + variance). For full fine-tuning: 60.5M × 3 × 4 bytes ≈ 726 MB. For Prompt Tuning: 4,096 × 3 × 4 bytes ≈ 48 KB. The difference is dramatic.
+The Adam optimiser stores 2 extra copies of every trainable parameter (momentum + variance). For full fine-tuning: 60.5M × 3 × 4 bytes ≈ 726 MB. For Prompt Tuning (20 tokens): 10,240 × 3 × 4 bytes ≈ 120 KB. The difference is dramatic.
 
 **Cost:**
 Full fine-tuning of large models requires expensive multi-GPU setups. Prompt Tuning of even large models can often be done on a single consumer GPU because the optimizer memory is negligible.
-
----
 
 ## 9. How to Run
 
 ### Prerequisites
 
+To run any of the implementations, install the required packages:
+
 ```bash
-pip install torch transformers peft datasets
+pip install torch transformers peft datasets streamlit
 ```
 
-### Running the Application
+### 🎮 Option A: Streamlit Web Dashboard (Recommended)
 
+This provides a rich, visual interface to train the model, monitor training loss in real-time, view detailed parameter comparisons, and test custom sentiment inputs.
+
+Run the Streamlit application:
+```bash
+streamlit run streamlit_app.py
+```
+
+### 💻 Option B: Interactive CLI App
+
+This provides a terminal-based interactive console menu.
+
+Run the CLI application:
 ```bash
 python app.py
 ```
 
-### CLI Menu
-
+#### CLI Menu Structure
 ```
-╔══════════════════════════════════════════════╗
-║     PROMPT TUNING PoC — Interactive Menu     ║
-╠══════════════════════════════════════════════╣
-║  1. Train Prompt-Tuned Model                 ║
-║  2. Evaluate Model on Test Set               ║
-║  3. Compare Parameters (Full FT vs PT)       ║
-║  4. Test Custom Text                         ║
-║  5. Exit                                     ║
-╚══════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════╗
+║       PROMPT TUNING PoC — Interactive Menu       ║
+╠══════════════════════════════════════════════════╣
+║  1. Train Prompt-Tuned Model                     ║
+║  2. Evaluate Model on Test Set                   ║
+║  3. Compare Parameters (Full FT vs PT)           ║
+║  4. Test Custom Text                             ║
+║  5. Import/Load Saved Model                      ║
+║  6. Exit                                         ║
+╚══════════════════════════════════════════════════╝
 ```
 
 > [!TIP]
-> Run option **1** first to train the soft prompt, then use options **2–4** to explore results.
+> Run option **1** first to train the soft prompt (or option **5** to load pre-trained weights if available), then use options **2–4** to explore and evaluate.
 
----
+### 📜 Option C: Minimal Programmatic PoC
+
+This is a lightweight, non-interactive script that runs a complete prompt tuning workflow on a tiny dummy dataset. It is ideal for debugging and stepping through the core PEFT mechanics.
+
+Run the PoC script:
+```bash
+python prompt_tuning_poc.py
+```
+
 
 ## 10. Viva Preparation
 
@@ -339,16 +367,22 @@ T5 (Text-to-Text Transfer Transformer) is the model used in the original paper. 
 Full fine-tuning updates all parameters, requiring more memory, compute, and storage. For large models, it's impractical. Prompt Tuning achieves comparable results at a fraction of the cost.
 
 **Q9. What did you implement?**
-A single-file PoC that trains a soft prompt on the SST-2 sentiment analysis dataset using T5-Small, then compares trainable parameters between full fine-tuning and prompt tuning, and allows interactive testing.
+We implemented three variations of Prompt Tuning in this repository:
+1. **Streamlit Web Dashboard (`streamlit_app.py`)**: A rich, visual web application for training, real-time loss tracking, parameter comparison, and interactive testing.
+2. **Interactive CLI App (`app.py`)**: A terminal-based menu-driven application for training on SST-2, evaluating on validation datasets, testing custom text, and saving/loading prompts.
+3. **Programmatic PoC (`prompt_tuning_poc.py`)**: A self-contained, minimal script running end-to-end training and inference on a dummy dataset for easy conceptual tracing.
 
 **Q10. What dataset did you use and why?**
 SST-2 (Stanford Sentiment Treebank) — a binary sentiment classification dataset. It's small, well-understood, and commonly used as a benchmark in the original paper.
 
 **Q11. How many parameters does your soft prompt have?**
-8 virtual tokens × 512 embedding dimensions = 4,096 trainable parameters.
+- **Streamlit / CLI Applications**: 20 virtual tokens × 512 embedding dimensions = 10,240 trainable parameters.
+- **Programmatic PoC**: 8 virtual tokens × 512 embedding dimensions = 4,096 trainable parameters.
 
 **Q12. What percentage of the model is trainable?**
-Approximately 0.0068% — less than one hundredth of a percent.
+- **Streamlit / CLI Applications**: Approximately 0.0169%.
+- **Programmatic PoC**: Approximately 0.0068%.
+Both are extremely small fractions (under 0.02%) of the base T5-Small model (60.5 million parameters).
 
 **Q13. What is the T5 text-to-text framework?**
 T5 converts every NLP task into a text-in, text-out format. For sentiment analysis: input = "This movie is great" → output = "positive".
@@ -407,43 +441,47 @@ We use T5-Small (a small model) where prompt tuning has a bigger gap vs. full fi
 
 **Step 3 — Show the Code (30 seconds)**
 
-> "Our implementation is a single Python file using HuggingFace's PEFT library. Here's the key part — we create a PromptTuningConfig with 8 virtual tokens, wrap the frozen T5-Small model with it, and train. Let me run it."
+> "We have three implementations in this repository. Our interactive CLI and Streamlit dashboard use HuggingFace's PEFT library to wrap a frozen T5-Small model with a 20-virtual-token soft prompt. We also have a minimal programmatic script (`prompt_tuning_poc.py`) using an 8-token prompt. Let's see the interactive CLI app in action."
 
 **Step 4 — Train the Model (30 seconds)**
 
 ```
 > Select option: 1
-> Training started...
-> Epoch 1/5 — Loss: 2.34
-> Epoch 5/5 — Loss: 0.12
+> Loading T5-Small model and tokenizer...
+> Loading SST-2 dataset...
+> Training started... Watch the soft prompt parameters update while T5 remains frozen!
+> Epoch 1/10 — Loss: 2.34
+...
+> Epoch 10/10 — Loss: 0.12
 > Training complete!
 ```
 
 **Step 5 — Show the Comparison (30 seconds)**
 
 ```
-> Select option: 3
-
-╔══════════════════════════════════════════════════╗
-║          PARAMETER COMPARISON                    ║
-╠══════════════════════════════════════════════════╣
-║  Full Fine-Tuning:    60,506,624 (100%)          ║
-║  Prompt Tuning:            4,096 (0.0068%)       ║
-║  Reduction:            14,771x fewer params      ║
-╚══════════════════════════════════════════════════╝
+╔════════════════════════════════════════════════════════════╗
+║  PARAMETER COMPARISON: Full Fine-Tuning vs Prompt Tuning    ║
+╠════════════════════════════════════════════════════════════╣
+║  Full Fine-Tuning Trainable:      60,506,624  (100.00%)    ║
+║  Prompt Tuning Trainable:             10,240  (0.0169%)    ║
+║────────────────────────────────────────────────────────────║
+║  Parameter Reduction:                  5,909×  fewer       ║
+║  Parameters Saved:                   99.9831%              ║
+╚════════════════════════════════════════════════════════════╝
 ```
 
 **Step 6 — Test with Custom Input (30 seconds)**
 
 ```
 > Select option: 4
-> Enter text: "This research paper is brilliantly written"
-> Prediction: positive ✓
+🔮 Custom Text Prediction
+Enter text: "This research paper is brilliantly written"
+   → Prediction: positive 😊
 ```
 
 **Step 7 — Conclusion (30 seconds)**
 
-> "We demonstrated that by training just 4,096 parameters — 0.007% of the model — we can adapt a frozen T5 model for sentiment analysis. The paper proves this approach scales: at 11 billion parameters, prompt tuning fully matches fine-tuning. This is the future of efficient model adaptation."
+> "By training just 10,240 parameters — only 0.0169% of the model — we successfully adapted a frozen T5-Small model for sentiment analysis. In the minimal PoC script, we went as low as 4,096 parameters (0.0068%). The paper proves that at 11 billion parameters (T5-XXL), this extremely efficient method matches full fine-tuning. This dramatically lowers serving and storage costs."
 
 ---
 
@@ -452,9 +490,9 @@ We use T5-Small (a small model) where prompt tuning has a bigger gap vs. full fi
 Prompt Tuning represents a paradigm shift in how we adapt large language models. Instead of the brute-force approach of updating billions of parameters, it shows that a tiny learned "steering signal" — the soft prompt — is sufficient to guide a frozen model to perform specific tasks.
 
 Our implementation demonstrates this concept practically:
-- **4,096 trainable parameters** out of 60.5 million (0.0068%)
-- **Binary sentiment classification** on SST-2 using T5-Small
-- **Interactive CLI** for training, evaluation, and testing
+- **10,240 trainable parameters** (for 20 virtual tokens, 0.0169%) or **4,096 trainable parameters** (for 8 virtual tokens, 0.0068%) out of 60.5 million.
+- **Binary sentiment classification** on SST-2 using T5-Small.
+- **Rich Streamlit web dashboard** and **Interactive CLI** for visual training, evaluation, and testing.
 
 The key insight from the paper: **scale is all you need** — as models get larger, the gap between prompt tuning and full fine-tuning vanishes completely.
 
